@@ -1,0 +1,38 @@
+# 編譯產物
+minivmac
+*.o
+*.exe
+*.app
+
+# 建置目錄
+bld/*.o
+bld/GLOBGLUE.o
+bld/M68KITAB.o
+bld/MINEM68K.o
+bld/OSGLUSD2.o
+bld/PROGMAIN.o
+bld/ROMEMDEV.o
+bld/RTCEMDEV.o
+bld/SCCEMDEV.o
+bld/SCRNEMDV.o
+bld/SCSIEMDV.o
+bld/SNDEMDEV.o
+bld/SONYEMDV.o
+bld/text_utf8_sdl.o
+bld/IWMEMDEV.o
+bld/KBRDEMDV.o
+bld/MOUSEMDV.o
+
+# 自動生成的配置檔案
+cfg/CNFGGLOB.h
+cfg/CNFGRAPI.h
+cfg/EMCONFIG.h
+cfg/STRCONST.h
+setup/minivmac-setup
+
+# 字體檔案（大型二進位檔案）
+*.otf
+*.ttf
+
+# macOS 系統檔案
+.DS_Store

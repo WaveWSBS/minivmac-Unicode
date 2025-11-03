@@ -1,0 +1,86 @@
+# Mini vMac (SDL2 + SDL_ttf) build script that survives setup rewrites
+
+CC          ?= cc
+PKG_CONFIG  ?= pkg-config
+SDL2_CONFIG ?= sdl2-config
+
+# Resolve SDL2 compile/link flags. Fallback to Homebrew defaults when missing.
+SDL2_CFLAGS := $(shell $(SDL2_CONFIG) --cflags 2>/dev/null)
+SDL2_LIBS   := $(shell $(SDL2_CONFIG) --libs 2>/dev/null)
+ifeq ($(strip $(SDL2_CFLAGS)),)
+SDL2_CFLAGS := -I/opt/homebrew/include/SDL2 -D_THREAD_SAFE
+SDL2_LIBS   := -L/opt/homebrew/lib -lSDL2
+endif
+
+SDL2_TTF_CFLAGS := $(shell $(PKG_CONFIG) --cflags sdl2_ttf 2>/dev/null)
+SDL2_TTF_LIBS   := $(shell $(PKG_CONFIG) --libs sdl2_ttf 2>/dev/null)
+ifeq ($(strip $(SDL2_TTF_CFLAGS)),)
+SDL2_TTF_CFLAGS := -I/opt/homebrew/include -I/opt/homebrew/include/SDL2
+SDL2_TTF_LIBS   := -L/opt/homebrew/lib -lSDL2_ttf
+endif
+
+WARNFLAGS   := -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wundef \
+               -Wpointer-arith -Wcast-align
+INCLUDES    := -Icfg -Isrc
+CFLAGS     ?=
+LANG_HEADER ?= STRCONZHT.h
+
+CFLAGS     += $(WARNFLAGS) -O2 $(INCLUDES) $(SDL2_CFLAGS) $(SDL2_TTF_CFLAGS) \
+              -DEnableUnicodeOverlay=1 -DSTRCONST_OVERRIDE=\"$(LANG_HEADER)\"
+LDFLAGS    ?=
+LDLIBS     += $(SDL2_LIBS) $(SDL2_TTF_LIBS)
+
+SRC_DIR      := src
+OBJ_DIR      := bld
+
+# Build only the SDL2 front-end set the setup-generated Makefile uses,
+# then add our UTF-8 renderer. Compiling all sources leads to missing
+# macros/symbols in optional devices (ADB, ASC, etc.).
+SRCS := \
+  $(SRC_DIR)/MINEM68K.c \
+  $(SRC_DIR)/OSGLUSD2.c \
+  $(SRC_DIR)/GLOBGLUE.c \
+  $(SRC_DIR)/M68KITAB.c \
+  $(SRC_DIR)/VIAEMDEV.c \
+  $(SRC_DIR)/IWMEMDEV.c \
+  $(SRC_DIR)/SCCEMDEV.c \
+  $(SRC_DIR)/RTCEMDEV.c \
+  $(SRC_DIR)/ROMEMDEV.c \
+  $(SRC_DIR)/SCSIEMDV.c \
+  $(SRC_DIR)/SONYEMDV.c \
+  $(SRC_DIR)/SCRNEMDV.c \
+  $(SRC_DIR)/MOUSEMDV.c \
+  $(SRC_DIR)/KBRDEMDV.c \
+  $(SRC_DIR)/SNDEMDEV.c \
+  $(SRC_DIR)/PROGMAIN.c \
+  $(SRC_DIR)/text_utf8_sdl.c
+
+OBJS     := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+
+CONFIG_HEADERS := cfg/CNFGGLOB.h cfg/CNFGRAPI.h cfg/STRCONST.h cfg/EMCONFIG.h
+
+.PHONY: all clean show-sources
+all: minivmac
+
+minivmac: $(CONFIG_HEADERS) $(OBJ_DIR) $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
+
+$(OBJ_DIR):
+	@mkdir -p $@
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(CONFIG_HEADERS) | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(CONFIG_HEADERS):
+	@echo "error: missing generated config $@" >&2
+	@echo "       run: ./setup/minivmac-setup -t xgen -api sd2 > gen_config.sh" >&2
+	@echo "            sh gen_config.sh" >&2
+	@exit 1
+
+show-sources:
+	@printf "SDL2 sources (excluding other front-ends):\n"
+	@printf "  %s\n" $(SRCS)
+
+clean:
+	rm -f $(OBJS) minivmac
+	@if [ -d $(OBJ_DIR) ]; then rmdir $(OBJ_DIR) 2>/dev/null || true; fi

@@ -27,7 +27,15 @@
 
 #include "MYOSGLUE.h"
 
+/* Allow overriding the language header without touching cfg/STRCONST.h */
+#ifdef STRCONST_OVERRIDE
+#include STRCONST_OVERRIDE
+#else
 #include "STRCONST.h"
+#endif
+#include "text_utf8_sdl.h"
+
+#include <SDL.h>
 
 /* --- some simple utilities --- */
 
@@ -171,6 +179,10 @@ LOCALPROC dbglog_close0(void)
 #include "COMOSGLU.h"
 
 #include "PBUFSTDC.h"
+
+#ifndef SDLUseFastTextureCopy
+#define SDLUseFastTextureCopy 0
+#endif
 
 #include "CONTROLM.h"
 
@@ -842,7 +854,8 @@ LOCALPROC HaveChangedScreenBuff(ui4r top, ui4r left,
 			/* white */
 	}
 
-	if ((0 == ((bpp - 1) & bpp)) /* a power of 2 */
+	if (SDLUseFastTextureCopy
+		&& (0 == ((bpp - 1) & bpp)) /* a power of 2 */
 		&& (pitch == ExpectedPitch)
 #if (vMacScreenDepth > 3)
 		&& ! UseColorMode
@@ -4138,11 +4151,46 @@ LOCALPROC UninitWhereAmI(void)
 }
 #endif
 
+#if EnableUnicodeOverlay
+LOCALFUNC blnr InitUnicodeOverlayFont(void)
+{
+	const char *env_path = SDL_getenv("MINIVMAC_FONT");
+	char *font_path = NULL;
+	const char *chosen = NULL;
+
+	if ((NULL != env_path) && (0 != env_path[0])) {
+		chosen = env_path;
+	} else if ((NULL != app_parent)
+		&& (mnvm_noErr == ChildPath(app_parent, "unifont.otf", &font_path)))
+	{
+		chosen = font_path;
+	} else {
+		chosen = "unifont.otf";
+	}
+
+	(void)TextUtf8_Init(chosen, 14);
+
+	if (NULL != font_path) {
+		free(font_path);
+	}
+
+	return trueblnr;
+}
+
+LOCALPROC QuitUnicodeOverlayFont(void)
+{
+	TextUtf8_Quit();
+}
+#endif
+
 LOCALFUNC blnr InitOSGLU(void)
 {
 	if (AllocMyMemory())
 #if CanGetAppPath
 	if (InitWhereAmI())
+#endif
+#if EnableUnicodeOverlay
+	if (InitUnicodeOverlayFont())
 #endif
 #if dbglog_HAVE
 	if (dbglog_open())
@@ -4188,6 +4236,10 @@ LOCALPROC UnInitOSGLU(void)
 
 #if dbglog_HAVE
 	dbglog_close();
+#endif
+
+#if EnableUnicodeOverlay
+	QuitUnicodeOverlayFont();
 #endif
 
 #if CanGetAppPath

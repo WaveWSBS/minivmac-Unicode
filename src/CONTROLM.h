@@ -24,6 +24,12 @@
 #define CONTROLM_H
 #endif
 
+#include "text_utf8_sdl.h"
+
+#ifndef EnableUnicodeOverlay
+#define EnableUnicodeOverlay 0
+#endif
+
 enum {
 #if EnableDemoMsg
 	SpclModeDemo,
@@ -54,6 +60,122 @@ LOCALVAR blnr NeedWholeScreenDraw = falseblnr;
 #define MacMsgDisplayed SpecialModeTst(SpclModeMessage)
 
 LOCALVAR ui3p CntrlDisplayBuff = nullpr;
+
+#if EnableUnicodeOverlay
+
+#define OverlayUtf8BufferBytes (ClStrMaxLength * 6)
+
+LOCALPROC OverlayUtf8AppendByte(char *buf, int bufsize, int *len, unsigned char value)
+{
+	if (*len >= bufsize - 1) {
+		return;
+	}
+	buf[*len] = (char)value;
+	(*len)++;
+	buf[*len] = 0;
+}
+
+LOCALPROC OverlayUtf8AppendCodepoint(char *buf, int bufsize, int *len, ui4r codepoint)
+{
+	if (*len >= bufsize - 1) {
+		return;
+	}
+	if (codepoint < 0x80) {
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)codepoint);
+	} else if (codepoint < 0x800) {
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0xC0 | (codepoint >> 6)));
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0x80 | (codepoint & 0x3F)));
+	} else if (codepoint < 0x10000) {
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0xE0 | (codepoint >> 12)));
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0x80 | ((codepoint >> 6) & 0x3F)));
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0x80 | (codepoint & 0x3F)));
+	} else if (codepoint <= 0x10FFFF) {
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0xF0 | (codepoint >> 18)));
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0x80 | ((codepoint >> 12) & 0x3F)));
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0x80 | ((codepoint >> 6) & 0x3F)));
+		OverlayUtf8AppendByte(buf, bufsize, len, (unsigned char)(0x80 | (codepoint & 0x3F)));
+	}
+}
+
+LOCALPROC OverlayExpandSubstToUtf8(char *s, char *dest, int dest_size, int *dest_len)
+{
+	char *p = s;
+	char c;
+
+	while (0 != (c = *p++)) {
+		if ('^' == c) {
+			char next = *p++;
+			if (0 == next) {
+				break;
+			}
+			{
+				char *sub = GetSubstitutionStr(next);
+				if (nullpr != sub) {
+					OverlayExpandSubstToUtf8(sub, dest, dest_size, dest_len);
+				}
+			}
+		} else if (';' == c) {
+			char key = *p++;
+			if (0 == key) {
+				break;
+			}
+			switch (key) {
+				case '[':
+					OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x201C);
+					break;
+				case '{':
+					OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x201D);
+					break;
+				case ']':
+					OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x2018);
+					break;
+				case '}':
+					OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x2019);
+					break;
+				case 'g':
+					OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x00A9);
+					break;
+				case 'l': {
+					char modifier = *p++;
+					if (0 == modifier) {
+						break;
+					}
+					switch (modifier) {
+						case 'a':
+							OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x2019);
+							break;
+						case 'l':
+							OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x2026);
+							break;
+						case 's':
+							OverlayUtf8AppendByte(dest, dest_size, dest_len, (unsigned char)';');
+							break;
+						case '.':
+							OverlayUtf8AppendByte(dest, dest_size, dest_len, (unsigned char)'.');
+							break;
+						case 'E':
+							OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x00C6);
+							break;
+						case 'e':
+							OverlayUtf8AppendCodepoint(dest, dest_size, dest_len, 0x00E6);
+							break;
+						default:
+							OverlayUtf8AppendByte(dest, dest_size, dest_len, (unsigned char)modifier);
+							break;
+					}
+					break;
+				}
+				default:
+					OverlayUtf8AppendByte(dest, dest_size, dest_len, (unsigned char)key);
+					break;
+			}
+		} else {
+			OverlayUtf8AppendByte(dest, dest_size, dest_len, (unsigned char)c);
+		}
+	}
+}
+
+#endif /* EnableUnicodeOverlay */
 
 LOCALPROC DrawCell(unsigned int h, unsigned int v, int x)
 {
@@ -201,6 +323,53 @@ LOCALPROC DrawCellsBlankLine(void)
 
 LOCALPROC DrawCellsFromStr(char *s)
 {
+#if EnableUnicodeOverlay
+    /* When compiled for B/W builds (vMacScreenDepth == 0), UseColorMode
+       is not defined. Treat it as false in that case. */
+#if (0 != vMacScreenDepth)
+    blnr _overlayColorMode = UseColorMode;
+#else
+    blnr _overlayColorMode = 0;
+#endif
+
+    if ((0 == vMacScreenDepth) || !_overlayColorMode) {
+		char utf8_buf[OverlayUtf8BufferBytes];
+		int utf8_len = 0;
+
+		utf8_buf[0] = 0;
+		OverlayExpandSubstToUtf8(s, utf8_buf, OverlayUtf8BufferBytes, &utf8_len);
+
+		if ((utf8_len > 0) && (CurCellh0 < hLimit)) {
+            si4b drawn_px = TextUtf8_DrawLineToCntrlBuff(
+                CurCellh0 * 8,
+                CurCellv0 * 16 + 11,
+                utf8_buf,
+                0x000000,
+                0x00FFFFFF,
+                vMacScreenDepth,
+                _overlayColorMode,
+                vMacScreenMonoByteWidth,
+                vMacScreenByteWidth,
+                CntrlDisplayBuff,
+                (hLimit - CurCellh0) * 8,
+                vMacScreenWidth,
+                vMacScreenHeight);
+
+			if (drawn_px >= 0) {
+				si4b delta_cells = (drawn_px + 7) >> 3;
+				if (delta_cells <= 0) {
+					delta_cells = 1;
+				}
+				CurCellh0 += delta_cells;
+				if (CurCellh0 > hLimit) {
+					CurCellh0 = hLimit;
+				}
+				return;
+			}
+		}
+	}
+#endif
+
 	ui3b ps[ClStrMaxLength];
 	ui3b cs;
 	int L;
