@@ -346,7 +346,11 @@ LOCALPROC DrawCellsFromStr(char *s)
 			
 			while (*p != '\0' && remaining_len > 0) {
 				if (CurCellh0 >= hLimit) {
-					/* Need to wrap to next line - don't fill with spaces */
+					/* Need to wrap to next line - fill remaining cells with spaces */
+					int i;
+					for (i = CurCellh0; i < hLimit; ++i) {
+						DrawCell(i, CurCellv0, kCellSpace);
+					}
 					DrawCell(hLimit, CurCellv0, kCellMiddleRight);
 					CurCellv0++;
 					DrawCellsBeginLine();
@@ -357,7 +361,6 @@ LOCALPROC DrawCellsFromStr(char *s)
 				/* Try to draw as much as possible */
 				char chunk[OverlayUtf8BufferBytes];
 				int chunk_len = 0;
-				const char *test_p = p;
 				
 				/* Binary search for the longest substring that fits */
 				int left = 1;
@@ -392,8 +395,8 @@ LOCALPROC DrawCellsFromStr(char *s)
 						CurCellh0 * 8,
 						CurCellv0 * 16 + 11,
 						chunk,
-						0x000000,
-						0x00FFFFFF,
+						0x0000,
+						0xFFFF,
 						vMacScreenDepth,
 						_overlayColorMode,
 						vMacScreenMonoByteWidth,
@@ -416,8 +419,7 @@ LOCALPROC DrawCellsFromStr(char *s)
 					break;  /* Can't fit anything, give up */
 				}
 			}
-			/* Set CurCellh0 to hLimit so DrawCellsEndLine won't fill with spaces */
-			CurCellh0 = hLimit;
+			/* Don't set CurCellh0 to hLimit - let DrawCellsEndLine fill remaining space */
 			return;
 		}
 	}
