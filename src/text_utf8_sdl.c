@@ -32,6 +32,9 @@ GLOBALFUNC blnr TextUtf8_Init(const char *font_path, int pixel_size)
 		return falseblnr;
 	}
 
+	/* Enable hinting for better clarity */
+	TTF_SetFontHinting(g_text_utf8_font, TTF_HINTING_NORMAL);
+
 	return trueblnr;
 }
 
@@ -46,6 +49,20 @@ GLOBALPROC TextUtf8_Quit(void)
 		TTF_Quit();
 		g_text_utf8_ttf_inited = falseblnr;
 	}
+}
+
+GLOBALFUNC si4b TextUtf8_MeasureWidth(const char *utf8)
+{
+	if (NULL == utf8 || NULL == g_text_utf8_font) {
+		return -1;
+	}
+
+	int w = 0, h = 0;
+	if (TTF_SizeUTF8(g_text_utf8_font, utf8, &w, &h) != 0) {
+		return -1;
+	}
+
+	return (si4b)w;
 }
 
 GLOBALFUNC si4b TextUtf8_DrawLineToCntrlBuff(
@@ -150,7 +167,8 @@ GLOBALFUNC si4b TextUtf8_DrawLineToCntrlBuff(
 			/* clear background to white */
 			*dest_byte &= (ui3b)(~mask);
 
-			if (alpha > 32) {
+			/* Use higher threshold for better anti-aliasing (128 = 50% opacity) */
+			if (alpha > 128) {
 				*dest_byte |= mask;
 			}
 		}

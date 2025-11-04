@@ -4168,7 +4168,7 @@ LOCALFUNC blnr InitUnicodeOverlayFont(void)
 		chosen = "unifont.otf";
 	}
 
-	(void)TextUtf8_Init(chosen, 14);
+	(void)TextUtf8_Init(chosen, 18);
 
 	if (NULL != font_path) {
 		free(font_path);

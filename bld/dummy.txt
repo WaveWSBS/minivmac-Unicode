@@ -1,1 +1,2 @@
-dummy
+This file is here because some archive extraction
+software will not create an empty directory.

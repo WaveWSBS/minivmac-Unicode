@@ -41,6 +41,9 @@ typedef int blnr;
 GLOBALFUNC blnr TextUtf8_Init(const char *font_path, int pixel_size);
 GLOBALPROC TextUtf8_Quit(void);
 
+/* Measure the pixel width of a UTF-8 string. Returns -1 on error. */
+GLOBALFUNC si4b TextUtf8_MeasureWidth(const char *utf8);
+
 GLOBALFUNC si4b TextUtf8_DrawLineToCntrlBuff(
 	int x_px,
 	int y_px,

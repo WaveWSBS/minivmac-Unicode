@@ -339,33 +339,86 @@ LOCALPROC DrawCellsFromStr(char *s)
 		utf8_buf[0] = 0;
 		OverlayExpandSubstToUtf8(s, utf8_buf, OverlayUtf8BufferBytes, &utf8_len);
 
-		if ((utf8_len > 0) && (CurCellh0 < hLimit)) {
-            si4b drawn_px = TextUtf8_DrawLineToCntrlBuff(
-                CurCellh0 * 8,
-                CurCellv0 * 16 + 11,
-                utf8_buf,
-                0x000000,
-                0x00FFFFFF,
-                vMacScreenDepth,
-                _overlayColorMode,
-                vMacScreenMonoByteWidth,
-                vMacScreenByteWidth,
-                CntrlDisplayBuff,
-                (hLimit - CurCellh0) * 8,
-                vMacScreenWidth,
-                vMacScreenHeight);
-
-			if (drawn_px >= 0) {
-				si4b delta_cells = (drawn_px + 7) >> 3;
-				if (delta_cells <= 0) {
-					delta_cells = 1;
+		if (utf8_len > 0) {
+			/* Simple auto-wrap: draw as much as fits, then continue on next line */
+			const char *p = utf8_buf;
+			int remaining_len = utf8_len;
+			
+			while (*p != '\0' && remaining_len > 0) {
+				if (CurCellh0 >= hLimit) {
+					/* Need to wrap to next line - don't fill with spaces */
+					DrawCell(hLimit, CurCellv0, kCellMiddleRight);
+					CurCellv0++;
+					DrawCellsBeginLine();
 				}
-				CurCellh0 += delta_cells;
-				if (CurCellh0 > hLimit) {
-					CurCellh0 = hLimit;
+				
+				si4b available_px = (hLimit - CurCellh0) * 8;
+				
+				/* Try to draw as much as possible */
+				char chunk[OverlayUtf8BufferBytes];
+				int chunk_len = 0;
+				const char *test_p = p;
+				
+				/* Binary search for the longest substring that fits */
+				int left = 1;
+				int right = remaining_len;
+				int best = 0;
+				
+				while (left <= right) {
+					int mid = (left + right) / 2;
+					int i;
+					for (i = 0; i < mid && i < OverlayUtf8BufferBytes - 1; i++) {
+						chunk[i] = p[i];
+					}
+					chunk[i] = '\0';
+					
+					si4b width = TextUtf8_MeasureWidth(chunk);
+					if (width >= 0 && width <= available_px) {
+						best = mid;
+						left = mid + 1;
+					} else {
+						right = mid - 1;
+					}
 				}
-				return;
+				
+				if (best > 0) {
+					/* Draw this chunk */
+					for (chunk_len = 0; chunk_len < best && chunk_len < OverlayUtf8BufferBytes - 1; chunk_len++) {
+						chunk[chunk_len] = p[chunk_len];
+					}
+					chunk[chunk_len] = '\0';
+					
+					si4b drawn_px = TextUtf8_DrawLineToCntrlBuff(
+						CurCellh0 * 8,
+						CurCellv0 * 16 + 11,
+						chunk,
+						0x000000,
+						0x00FFFFFF,
+						vMacScreenDepth,
+						_overlayColorMode,
+						vMacScreenMonoByteWidth,
+						vMacScreenByteWidth,
+						CntrlDisplayBuff,
+						available_px,
+						vMacScreenWidth,
+						vMacScreenHeight);
+					
+					if (drawn_px >= 0) {
+						si4b delta_cells = (drawn_px + 7) >> 3;
+						if (delta_cells <= 0) delta_cells = 1;
+						CurCellh0 += delta_cells;
+						if (CurCellh0 > hLimit) CurCellh0 = hLimit;
+					}
+					
+					p += chunk_len;
+					remaining_len -= chunk_len;
+				} else {
+					break;  /* Can't fit anything, give up */
+				}
 			}
+			/* Set CurCellh0 to hLimit so DrawCellsEndLine won't fill with spaces */
+			CurCellh0 = hLimit;
+			return;
 		}
 	}
 #endif
