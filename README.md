@@ -36,7 +36,20 @@ Prerequisites
 - Install via Homebrew:
   - `brew install sdl2 sdl2_ttf`
 
-Generate config (required once per variant)
+Quick start after a fresh git clone
+```
+# 0) Rebuild the setup generator if it's not present (ignored by VCS)
+cc -O2 -o setup/minivmac-setup setup/tool.c
+
+# 1) Generate config for the SDL2 target
+./setup/minivmac-setup -t xgen -api sd2 > gen_config.sh
+sh gen_config.sh
+
+# 2) Build using the SDL2-specific makefile
+make -f Makefile.sdl -j4
+```
+
+Generate config (details)
 ```
 ./setup/minivmac-setup -t xgen -api sd2 > gen_config.sh
 sh gen_config.sh
@@ -98,6 +111,5 @@ License
 Acknowledgements
 - Paul C. Pratt and Mini vMac contributors.
 - SDL2, SDL_ttf/FreeType, HarfBuzz and the wider OSS community.
-
 
 

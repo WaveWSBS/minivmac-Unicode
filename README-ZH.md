@@ -37,7 +37,20 @@ Mini vMac（SDL2 + Unicode 疊加層）
 - 建議以 Homebrew 安裝：
   - `brew install sdl2 sdl2_ttf`
 
-產生設定（每種變體至少執行一次）
+全新 clone 快速開始
+```
+# 0) 若倉庫未提交 setup 生成器，可自行重建
+cc -O2 -o setup/minivmac-setup setup/tool.c
+
+# 1) 產生 SDL2 目標的設定
+./setup/minivmac-setup -t xgen -api sd2 > gen_config.sh
+sh gen_config.sh
+
+# 2) 使用 SDL2 專用的 Makefile 建置
+make -f Makefile.sdl -j4
+```
+
+產生設定（細節說明）
 ```
 ./setup/minivmac-setup -t xgen -api sd2 > gen_config.sh
 sh gen_config.sh
@@ -99,4 +112,3 @@ export MINIVMAC_FONT="/絕對/路徑/unifont.otf"
 致謝
 - Mini vMac 作者 Paul C. Pratt 與貢獻者。
 - SDL2、SDL_ttf/FreeType、HarfBuzz 與廣大開源社群。
-
