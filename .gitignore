@@ -30,9 +30,5 @@ cfg/EMCONFIG.h
 cfg/STRCONST.h
 setup/minivmac-setup
 
-# 字體檔案（大型二進位檔案）
-*.otf
-*.ttf
-
 # macOS 系統檔案
 .DS_Store
